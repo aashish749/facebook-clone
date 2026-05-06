@@ -43,9 +43,19 @@ const userSchema = new mongoose.Schema({
   googleId: {
     type: String,
   },
+  emailVerified: {
+    type: Boolean,
+    default: false,
+  },
   refreshToken: [
     {
-      type: String,
+      token: { type: String, required: true },
+      expiresAt: {
+        type: Date,
+        required: true,
+        default: () => new Date(+new Date() + 7 * 24 * 60 * 60 * 1000),
+      }, // The "deadline" for this token
+      createdAt: { type: Date, default: Date.now },
     },
   ],
   createdAt: {
