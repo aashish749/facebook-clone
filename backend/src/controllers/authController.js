@@ -2,11 +2,27 @@ import {
   generateToken,
   verifyToken,
   generateShortToken,
-} from "../services/jwt";
-import User from "../models/UserModel";
-import Otp from "../models/OtpModel";
-import bcrypt from "bcrypt";
-import { sendEmail } from "../services/emailService";
+} from "../services/jwt.js";
+import User from "../models/UserModel.js";
+import Otp from "../models/OtpModel.js";
+import bcrypt from "bcryptjs";
+
+const bcryptHash = (data, saltRounds) =>
+  new Promise((resolve, reject) => {
+    bcrypt.hash(data, saltRounds, (err, hash) => {
+      if (err) return reject(err);
+      resolve(hash);
+    });
+  });
+
+const bcryptCompare = (data, hash) =>
+  new Promise((resolve, reject) => {
+    bcrypt.compare(data, hash, (err, res) => {
+      if (err) return reject(err);
+      resolve(res);
+    });
+  });
+import { sendEmail } from "../services/emailService.js";
 import crypto from "crypto";
 
 const REFRESH_TOKEN_COOKIE = "refreshToken";
@@ -21,7 +37,13 @@ const cookieOptions = {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body || {};
+
+    if (!email || !password) {
+      return res
+        .status(400)
+        .json({ message: "Missing email or password in request body" });
+    }
 
     // Find the user by email
     const user = await User.findOne({ email });
@@ -30,7 +52,7 @@ export const login = async (req, res) => {
     }
 
     // Compare the provided password with the stored hash
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
+    const isMatch = await bcryptCompare(password, user.passwordHash);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -73,7 +95,15 @@ export const login = async (req, res) => {
 //signup controller
 export const signup = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password } = req.body || {};
+
+    if (!username || !email || !password) {
+      return res
+        .status(400)
+        .json({
+          message: "Missing username, email or password in request body",
+        });
+    }
 
     // Check if the user already exists
     const existingUser = await User.findOne({ email });
@@ -82,7 +112,7 @@ export const signup = async (req, res) => {
     }
 
     // Hash the password
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await bcryptHash(password, 10);
 
     // Create a new user
     const newUser = new User({
@@ -96,7 +126,7 @@ export const signup = async (req, res) => {
 
     // Generate OTP and store as separate Otp document
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit
-    const otpHash = await bcrypt.hash(otp, 10);
+    const otpHash = await bcryptHash(otp, 10);
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     const otpDoc = new Otp({
@@ -119,9 +149,16 @@ export const signup = async (req, res) => {
       "15m",
     );
 
-    res
-      .status(201)
-      .json({ message: "User created. OTP sent to email.", verificationToken });
+    const responseBody = {
+      message: "User created. OTP sent to email.",
+      verificationToken,
+    };
+
+    if (process.env.NODE_ENV !== "production") {
+      responseBody.debugOtp = otp;
+    }
+
+    res.status(201).json(responseBody);
   } catch (err) {
     console.error("Signup error:", err);
     res.status(500).json({ message: err.message });
@@ -159,7 +196,7 @@ export const verifyOtp = async (req, res) => {
         .json({ message: "Too many attempts. Request a new OTP." });
     }
 
-    const isMatch = await bcrypt.compare(otp, otpDoc.otpHash || "");
+    const isMatch = await bcryptCompare(otp, otpDoc.otpHash || "");
     if (!isMatch) {
       otpDoc.attempts = (otpDoc.attempts || 0) + 1;
       await otpDoc.save();
@@ -277,7 +314,7 @@ export const resendOtp = async (req, res) => {
 
     // Generate new OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpHash = await bcrypt.hash(otp, 10);
+    const otpHash = await bcryptHash(otp, 10);
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     if (existingOtp) {
@@ -302,7 +339,12 @@ export const resendOtp = async (req, res) => {
     const text = `Your verification code is: ${otp}. It will expire in 10 minutes.`;
     await sendEmail(email, subject, text);
 
-    res.json({ message: "OTP resent to email." });
+    const responseBody = { message: "OTP resent to email." };
+    if (process.env.NODE_ENV !== "production") {
+      responseBody.debugOtp = otp;
+    }
+
+    res.json(responseBody);
   } catch (err) {
     console.error("resendOtp error:", err);
     res.status(500).json({ message: err.message });
@@ -321,7 +363,7 @@ export const forgotPassword = async (req, res) => {
 
     // Generate OTP and store as separate Otp document
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpHash = await bcrypt.hash(otp, 10);
+    const otpHash = await bcryptHash(otp, 10);
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     const otpDoc = new Otp({

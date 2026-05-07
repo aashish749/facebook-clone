@@ -3,9 +3,12 @@ import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
-import authRoutes from "./routes/auth";
-import mediaRoutes from "./routes/media";
-import postsRoutes from "./routes/posts";
+import authRoutes from "./routes/auth.js";
+import mediaRoutes from "./routes/media.js";
+import postsRoutes from "./routes/posts.js";
+import usersRoutes from "./routes/users.js";
+import friendsRoutes from "./routes/friends.js";
+import reelsRoutes from "./routes/reels.js";
 
 const app = express();
 
@@ -19,6 +22,7 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+app.use(express.json());
 
 // Rate Limiter
 const limiter = rateLimit({
@@ -33,6 +37,9 @@ app.use("/api/auth", authRoutes);
 // Media and posts
 app.use("/api/media", mediaRoutes);
 app.use("/api/posts", postsRoutes);
+app.use("/api/users", usersRoutes);
+app.use("/api/friends", friendsRoutes);
+app.use("/api/reels", reelsRoutes);
 
 // API Routes Placeholder
 app.use("/api", (req, res) => {

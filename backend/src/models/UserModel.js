@@ -1,5 +1,23 @@
 import mongoose from "mongoose";
 
+const friendRequestsSchema = new mongoose.Schema(
+  {
+    Sent: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    Received: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+  },
+  { _id: false },
+);
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -27,18 +45,8 @@ const userSchema = new mongoose.Schema({
     },
   ],
   friendRequests: {
-    Sent: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
-    Received: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-      },
-    ],
+    type: friendRequestsSchema,
+    default: () => ({ Sent: [], Received: [] }),
   },
   googleId: {
     type: String,
